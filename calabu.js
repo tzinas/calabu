@@ -15,16 +15,12 @@ server.listen(18018, '0.0.0.0')
 const client = new net.Socket()
 
 client.on('connect', () => {
-  console.log('connected to peer')
-  client.write("{ type: 'hello', version: '0.3.1', agent: 'Calabu' }" + '\n')
+  console.log('Connected to peer')
+  const peer = new Peer(client)
 })
 
 client.on('error', () => {
   console.log('could not connect to peer')
-})
-
-client.on('data', data => {
-	console.log('Received: ' + data);
 })
 
 client.connect(18018, 'tzinas.ddns.net')
