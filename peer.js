@@ -108,7 +108,6 @@ export class ConnectedPeer {
       type: 'peers',
       peers: Object.values(this.peerManager.knownPeers).map(info => info.address)
     }
-    peersMessage.peers.push('tzinas.ddns.net:18018')
     this.logger(`Sending this known peers`, peersMessage)
     this.send(peersMessage)
   }
