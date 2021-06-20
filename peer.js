@@ -9,11 +9,11 @@ export class Peer {
 
   constructor(socket) {
     this.socket = socket
-    console.log(`Connected ${this.socket.remoteAddress}:${this.socket.remotePort}`)
+    this.logger(`Peer connected`)
     this.sendHello()
 
     socket.on('data', data => {
-      console.log('Received: ' + data)
+      this.logger('Received: ' + data)
       this.buffer += data
       const messages = this.buffer.split('\n')
       this.buffer = messages.pop()
@@ -22,15 +22,18 @@ export class Peer {
         try {
           messageObject = JSON.parse(message)
         } catch {
-          console.log('Could not parse message, disconnecting...')
+          this.logger('Could not parse message')
           this.socket.destroy()
         }
-        console.log('I have this message object: ', messageObject)
+        this.logger('I have this message object: ', messageObject)
 
         this.handleMessage(messageObject)
       })
     })
 
+    socket.on('end', () => {
+      this.logger('Peer disconnected')
+    })
   }
 
   send(message) {
@@ -44,7 +47,7 @@ export class Peer {
       agent: 'calabu - 0.3.1'
     }
 
-    console.log('Sending Hello')
+    this.logger('Sending Hello')
     this.send(helloMessage)
   }
 
@@ -53,7 +56,11 @@ export class Peer {
       return
     }
 
-    console.log('Unknown message type, disconnecting peer')
+    this.logger('Unknown message type')
     this.socket.destroy()
+  }
+
+  logger(message) {
+    console.log(`${this.socket.remoteAddress}:${this.socket.remotePort}: ${message}`)
   }
 }

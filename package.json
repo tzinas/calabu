@@ -16,5 +16,6 @@
   "bugs": {
     "url": "https://github.com/tzinas/calabu/issues"
   },
-  "homepage": "https://github.com/tzinas/calabu#readme"
+  "homepage": "https://github.com/tzinas/calabu#readme",
+  "dependencies": {}
 }
