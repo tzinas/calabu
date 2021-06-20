@@ -1,0 +1,20 @@
+{
+  "name": "calabu",
+  "type": "module",
+  "version": "0.3.1",
+  "description": "A Javascript implementation of the Marabu blockchain.",
+  "main": "calabu.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tzinas/calabu.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tzinas/calabu/issues"
+  },
+  "homepage": "https://github.com/tzinas/calabu#readme"
+}

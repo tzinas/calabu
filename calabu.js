@@ -1,15 +1,16 @@
-const net = require('net')
+import net from 'net'
+import { Peer } from './peer.js'
 
 const server = net.createServer(socket => {
   console.log('Peer connected')
-	socket.pipe(socket)
+  const peer = new Peer(socket)
 
   socket.on('end', () => {
-    console.log('Peer disconnected');
+    console.log('Peer disconnected')
   })
 })
 
-server.listen(18018, '127.0.0.1')
+server.listen(18018, '0.0.0.0')
 
 const client = new net.Socket()
 
@@ -24,6 +25,6 @@ client.on('error', () => {
 
 client.on('data', data => {
 	console.log('Received: ' + data);
-});
+})
 
-client.connect(18018, 'keftes.di.uoa.gr')
+client.connect(18018, 'tzinas.ddns.net')
