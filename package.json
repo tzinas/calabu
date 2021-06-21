@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/tzinas/calabu#readme",
   "dependencies": {
-    "level": "^7.0.0"
+    "level": "^7.0.0",
+    "sha256": "^0.2.0"
   }
 }

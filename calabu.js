@@ -1,28 +1,29 @@
 import net from 'net'
-import { ConnectedPeer, PeerManager } from './peer.js'
+import { ConnectedPeer, PeerManager } from './peers.js'
+import { ObjectManager } from './objects.js'
 
 const peerManager = new PeerManager()
 await peerManager.loadKnownPeers()
+const objectManager = new ObjectManager()
 
 const server = net.createServer(socket => {
-  console.log('Peer connected')
-  new ConnectedPeer(socket, peerManager)
+  new ConnectedPeer(socket, peerManager, objectManager)
 })
 
 server.listen(18018, '0.0.0.0')
 
-console.log('peerManager.knownPeers', peerManager.knownPeers)
 Object.values(peerManager.knownPeers).forEach(peer => {
   console.log(`Trying to connect to ${peer.address}`)
   const client = new net.Socket()
 
   client.on('connect', () => {
-    console.log('Connected to peer')
-    new ConnectedPeer(client, peerManager)
+    new ConnectedPeer(client, peerManager, objectManager)
   })
 
   client.on('error', () => {
-    console.log('Could not connect to peer')
+    const now = new Date()
+
+    console.log(`${now.toUTCString()} - ${client.remoteAddress}:${client.remotePort}: Could not connect to peer`)
   })
   const [address, port] = peer.address.split(':')
 
