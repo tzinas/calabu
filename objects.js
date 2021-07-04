@@ -39,7 +39,3 @@ export class ObjectManager {
     console.log(`${now.toUTCString()} - $calabu_object_manager: ${message}`, ...args)
   }
 }
-
-export class Transaction {
-  inputs
-}
