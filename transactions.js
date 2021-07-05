@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import Joi from 'joi'
-import canonicalize from './canonicalize.js'
-import { validateSignature } from './utils.js'
+import { validateSignature, signMessage } from './utils.js'
+import keyManager from './keys.js'
 
 import logger from './logger.js'
 
@@ -54,19 +54,19 @@ export class TransactionManager {
                                           publicKey: prevOutput.pubkey })
 
       if (!isValidSignature) {
-        logger.info('Transaction failed signature validation', transaction)
         return false
       }
 
-      logger.info(`Successfully validated transaction's signature`, transaction)
       return true
 
     })
 
     if (!isValid) {
+      logger.info('Transaction failed signature validation', transaction)
       return false
     }
 
+    logger.info(`Successfully validated transaction's signatures`, transaction)
     return true
   }
 
@@ -82,6 +82,7 @@ export class TransactionManager {
   }
 
   validateTransaction({ UTXO, transaction }) {
+    logger.info('Validating transaction', transaction)
     const isValid = _.every([
       this.validateTransactionSchema(transaction),
       this.validateTransactionSignatures({ UTXO, transaction })
@@ -97,6 +98,79 @@ export class TransactionManager {
 
     logger.info('Successfully validated the transaction', transaction)
     return true
+  }
+
+  getOutputFromUTXO({ UTXO, txid, index }) {
+    let outputObject = null
+
+    try {
+      outputObject = UTXO[txid][index]
+    } catch {
+      logger.info('Could not find output object in UTXO')
+      return false
+    }
+
+    if (!outputObject) {
+      logger.info('Could not find output object in UTXO')
+      return false
+    }
+
+    return outputObject
+  }
+
+  createTransaction({ keyPair, wallet, UTXO, receiverPublicKey, amount }) {
+    logger.info('Creating a transaction')
+    const transactionToSign = {
+      type: 'transaction',
+      inputs: [],
+      outputs: []
+    }
+
+    let totalAmount = 0
+    wallet[keyPair.publicKey].forEach(output => {
+      const outputFromUTXO = this.getOutputFromUTXO({ UTXO, ...output})
+
+      transactionToSign.inputs.push({
+        outpoint: {
+          ...output
+        },
+        sig: null
+      })
+
+      totalAmount += outputFromUTXO.value
+    })
+
+    const amountLeft = totalAmount - amount
+
+    if (amountLeft < 0) {
+      logger.warn('Not enough balance to make the transaction')
+      throw 'not-enough-balance'
+    }
+
+    transactionToSign.outputs.push({
+      pubkey: receiverPublicKey,
+      value: amount
+    })
+
+    if (amountLeft > 0) {
+      logger.info(`This transaction has change (${amountLeft} picabus)`)
+      transactionToSign.outputs.push({
+        pubkey: keyPair.publicKey,
+        value: totalAmount - amount
+      })
+    } else {
+      logger.info('This transaction does not have change')
+    }
+
+    const signedTransaction = _.cloneDeep(transactionToSign)
+
+    transactionToSign.inputs.forEach((input, inputIndex) => {
+      signedTransaction.inputs[inputIndex].sig = signMessage({ message: transactionToSign, privateKey: keyPair.privateKey })
+    })
+
+    logger.info('The transaction was signed')
+
+    return new Transaction(signedTransaction)
   }
 }
 
