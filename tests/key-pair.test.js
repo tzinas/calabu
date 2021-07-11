@@ -1,7 +1,7 @@
 import Joi from 'joi'
 
 import { createKeyPair, signMessage, validateSignature } from '../utils.js'
-import logger from '../logger'
+import { logger } from '../logger'
 
 
 beforeAll(() => {

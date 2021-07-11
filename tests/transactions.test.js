@@ -1,6 +1,6 @@
 import { ObjectManager } from '../objects.js'
 import { TransactionManager, Transaction } from '../transactions.js'
-import logger from '../logger'
+import { logger } from '../logger'
 
 beforeAll(() => {
   logger.transports.forEach(transport => {
