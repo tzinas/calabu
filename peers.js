@@ -174,7 +174,7 @@ export class ConnectedPeer extends Peer {
       object
     }
 
-    this.logger(`Sending object: %d`, canonicalize(objectToSend))
+    this.logger(`Sending object: %O`, canonicalize(objectToSend))
     this.send(objectToSend)
   }
 
