@@ -202,37 +202,26 @@ export class ConnectedPeer extends Peer {
     const objectId = this.objectManager.getObjectHash(object)
     this.objectManager.logger(`Received object with id ${objectId}`)
 
-    /*
-    if (!(await this.objectManager.getObject(objectId))) {
+    if (await this.objectManager.getObject(objectId)) {
       this.objectManager.logger(`Already have the object with id ${objectId}`)
       return
     }
-    */
 
     if (object.type === 'transaction') {
       this.transactionManager.logger(`Received transaction with id ${objectId}`)
       const transaction = new Transaction(object)
 
       const isValidTransaction = this.transactionManager.validateTransaction({
-        UTXO: {
-          '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d': {
-            0: {
-              pubkey: "77bd8ef0bf4d9423f3681b01f8b5b4cfdf0ee69fb356a7762589f1b65cdcab63",
-              value: 5
-            }
-          }
-        },
+        UTXO: {},
         transaction
       })
 
       if (isValidTransaction) {
-        this.transactionManager.logger(`The transaction is valid`)
         await this.objectManager.addObject(object)
         this.sendIHaveObject(objectId)
         return
       }
 
-      this.transactionManager.logger(`The transaction is not valid`)
       return
     }
   }

@@ -36,16 +36,9 @@ export class TransactionManager {
       const txid = input.outpoint.txid
       const index = input.outpoint.index
 
-      let prevOutput = null
-      try {
-        prevOutput = UTXO[txid][index]
-      } catch {
-        this.logger('Could not find previous output txid: %O', prevOutput)
-        return false
-      }
+      const prevOutput = this.getOutputFromUTXO({ UTXO, txid, index })
 
       if (!prevOutput) {
-        this.logger('Could not find previous output index', prevOutput)
         return false
       }
 
@@ -61,11 +54,11 @@ export class TransactionManager {
     })
 
     if (!isValid) {
-      this.logger('Transaction failed signature validation', transaction)
+      this.logger('Transaction failed signature validation')
       return false
     }
 
-    this.logger(`Successfully validated transaction's signatures`, transaction)
+    this.logger(`Successfully validated transaction's signatures`)
     return true
   }
 
@@ -80,11 +73,40 @@ export class TransactionManager {
     return true
   }
 
+  validateTransactionConservation({ UTXO, transaction }) {
+    let inputAmount = 0
+    let outputAmount = 0
+    transaction.inputs.forEach(input => {
+      const txid = input.outpoint.txid
+      const index = input.outpoint.index
+
+      const prevOutput = this.getOutputFromUTXO({ UTXO, txid, index })
+
+      if (!prevOutput) {
+        return
+      }
+      inputAmount += prevOutput.value
+    })
+
+    transaction.outputs.forEach(output => {
+      outputAmount += output.value
+    })
+
+    if (inputAmount < outputAmount) {
+      this.logger('This transaction does not satisfy the law of conservation')
+      return false
+    }
+
+    this.logger(`Successfully validated transaction' s law of conservation`, transaction)
+    return true
+  }
+
   validateTransaction({ UTXO, transaction }) {
     this.logger('Validating transaction', transaction)
     const isValid = _.every([
       this.validateTransactionSchema(transaction),
-      this.validateTransactionSignatures({ UTXO, transaction })
+      this.validateTransactionSignatures({ UTXO, transaction }),
+      this.validateTransactionConservation({ UTXO, transaction })
     ], validation => {
       return validation
     })
