@@ -1,7 +1,12 @@
+import net from 'net'
+
 import canonicalize from './canonicalize.js'
 import db from './db.js'
-import { Transaction } from './transactions.js'
+import { Transaction, TransactionManager } from './transactions.js'
 import { logger, colorizeAddress, colorizedPeerManager } from './logger.js'
+import { isNormalInteger } from './utils.js'
+import { ObjectManager } from './objects.js'
+import _ from 'lodash'
 
 const VERSION = '0.5.0'
 
@@ -28,13 +33,47 @@ export class PeerManager {
     }
   }
 
-  addNewPeer(newPeer) {
-    if (!this.knownPeers[newPeer.address]) {
-      this.knownPeers[newPeer.address] = newPeer
+  connectToKnownPeer = peer => {
+    this.logger(`Trying to connect to ${colorizeAddress(`${peer.address}`)}`)
+    const client = new net.Socket()
 
-      this.logger('Adding new peer %O', newPeer)
-      db.put('knownpeers', JSON.stringify(this.knownPeers))
+    const [address, port] = peer.address.split(':')
+
+    client.on('connect', () => {
+      new ConnectedPeer({ socket: client, peerManager: this, objectManager: new ObjectManager, transactionManager: new TransactionManager })
+    })
+
+    client.on('error', () => {
+      this.logger(`Could not connect to peer ${colorizeAddress(`${address}:${port}\x1B[39m`)}`)
+    })
+
+    if (!address || isNaN(parseInt(port, 10))) {
+      return
     }
+
+    client.connect(parseInt(port, 10), address)
+  }
+
+  addNewPeer(newPeer) {
+    if (this.knownPeers[newPeer.address]) {
+      return false
+    }
+
+    const [address, port] = newPeer.address.split(':')
+    const isValid = address && port &&
+                    address !== '127.0.0.1' &&
+                    isNormalInteger(port)
+
+    if (!isValid) {
+      return false
+    }
+
+    this.knownPeers[newPeer.address] = newPeer
+
+    db.put('knownpeers', JSON.stringify(this.knownPeers))
+    this.logger(`Added new peer ${colorizeAddress(newPeer.address)}`)
+
+    return newPeer
   }
 
   addNewConnectedPeer(peer) {
@@ -135,7 +174,7 @@ export class ConnectedPeer extends Peer {
       object
     }
 
-    this.logger(`Sending object: `, objectToSend)
+    this.logger(`Sending object: %d`, canonicalize(objectToSend))
     this.send(objectToSend)
   }
 
@@ -161,14 +200,17 @@ export class ConnectedPeer extends Peer {
 
   async receivedObject(object) {
     const objectId = this.objectManager.getObjectHash(object)
-    this.logger(`Received object with id ${objectId}`)
+    this.objectManager.logger(`Received object with id ${objectId}`)
 
+    /*
     if (!(await this.objectManager.getObject(objectId))) {
+      this.objectManager.logger(`Already have the object with id ${objectId}`)
       return
     }
+    */
 
     if (object.type === 'transaction') {
-      this.logger(`Received transaction with id ${objectId}`)
+      this.transactionManager.logger(`Received transaction with id ${objectId}`)
       const transaction = new Transaction(object)
 
       const isValidTransaction = this.transactionManager.validateTransaction({
@@ -184,17 +226,14 @@ export class ConnectedPeer extends Peer {
       })
 
       if (isValidTransaction) {
-        this.logger(`The transaction is valid`)
+        this.transactionManager.logger(`The transaction is valid`)
+        await this.objectManager.addObject(object)
         this.sendIHaveObject(objectId)
         return
       }
 
-      this.logger(`The transaction is not valid`)
+      this.transactionManager.logger(`The transaction is not valid`)
       return
-    }
-
-    if (await this.objectManager.addObject(object)) {
-      this.logger(`Already have object with id ${objectId}`)
     }
   }
 
@@ -239,7 +278,11 @@ export class ConnectedPeer extends Peer {
       this.agent = message.agent
       this.handshakeCompleted = true
       this.logger('Handshake completed')
-      this.peerManager.addNewPeer(peer)
+
+      if (this.peerManager.addNewPeer(peer)) {
+        this.peerManager.connectToKnownPeer(peer)
+      }
+
       this.getPeers()
       return
     }
@@ -255,11 +298,21 @@ export class ConnectedPeer extends Peer {
         this.socket.destroy()
         return
       }
-      message.peers.forEach(address => {
+      const peersAdded = message.peers.map(address => {
         const newPeer = new Peer()
         newPeer.address = address
-        this.peerManager.addNewPeer(newPeer)
+
+        if (this.peerManager.addNewPeer(newPeer)) {
+          this.peerManager.connectToKnownPeer(newPeer)
+          return newPeer
+        }
+
+        return false
       })
+      if (_.every(peersAdded, peer => !peer)) {
+        this.peerManager.logger('No new peers added')
+      }
+
       return
     }
 

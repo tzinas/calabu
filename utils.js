@@ -31,3 +31,8 @@ export const createKeyPair = () => {
 
 	return keyPair
 }
+
+export const isNormalInteger = str => {
+	var n = Math.floor(Number(str))
+	return n !== Infinity && String(n) === str && n >= 0 && n <= 49151
+}

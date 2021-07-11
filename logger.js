@@ -31,6 +31,7 @@ export const logger = createLogger({
 
 const orange = '\x1B[38;2;255;207;84m'
 const aqua = '\x1B[38;2;61;255;155m'
+const purple = '\x1B[38;2;207;135;255m'
 
 const end = '\x1B[39m'
 
@@ -40,4 +41,12 @@ export const colorizeAddress = (address) => {
 
 export const colorizedPeerManager = () => {
 	return aqua + '$calabu_peer_manager' + end
+}
+
+export const colorizeObjectManager = () => {
+	return purple + '$calabu_object_manager' + end
+}
+
+export const colorizeTransactionManager = () => {
+	return purple + '$calabu_transaction_manager' + end
 }

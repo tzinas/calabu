@@ -1,6 +1,7 @@
 import db from "./db.js"
 import canonicalize from './canonicalize.js'
 import sha256 from 'sha256'
+import { logger, colorizeObjectManager } from './logger.js'
 
 export class ObjectManager {
   getObjectHash(object) {
@@ -26,6 +27,7 @@ export class ObjectManager {
     const objectId = this.getObjectHash(object)
 
     if (await this.getObject(objectId)) {
+      this.logger(`Object with id ${objectId} already exists and cannot be added`)
       return false
     }
     await db.put(`object/${objectId}`, JSON.stringify(object))
@@ -34,8 +36,6 @@ export class ObjectManager {
   }
 
   logger(message, ...args) {
-    const now = new Date()
-
-    console.log(`${now.toUTCString()} - $calabu_object_manager: ${message}`, ...args)
+    logger.info(`${colorizeObjectManager()}: ${message}`, ...args)
   }
 }

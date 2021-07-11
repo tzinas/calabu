@@ -2,7 +2,7 @@ import _ from 'lodash'
 import Joi from 'joi'
 import { validateSignature, signMessage } from './utils.js'
 
-import { logger } from './logger.js'
+import { logger, colorizeTransactionManager } from './logger.js'
 
 const transactionSchema = Joi.object({
   inputs: Joi.array().items(Joi.object({
@@ -40,12 +40,12 @@ export class TransactionManager {
       try {
         prevOutput = UTXO[txid][index]
       } catch {
-        logger.info('Could not find previous output txid: %O', prevOutput)
+        this.logger('Could not find previous output txid: %O', prevOutput)
         return false
       }
 
       if (!prevOutput) {
-        logger.info('Could not find previous output index', prevOutput)
+        this.logger('Could not find previous output index', prevOutput)
         return false
       }
 
@@ -61,27 +61,27 @@ export class TransactionManager {
     })
 
     if (!isValid) {
-      logger.info('Transaction failed signature validation', transaction)
+      this.logger('Transaction failed signature validation', transaction)
       return false
     }
 
-    logger.info(`Successfully validated transaction's signatures`, transaction)
+    this.logger(`Successfully validated transaction's signatures`, transaction)
     return true
   }
 
   validateTransactionSchema(transaction) {
     const schemaValidation = transactionSchema.validate(transaction)
     if (schemaValidation.error) {
-      logger.info('Transaction schema validation failed', transaction, schemaValidation.error)
+      this.logger('Transaction schema validation failed', transaction, schemaValidation.error)
       return false
     }
 
-    logger.info('Successfully validated transaction schema', transaction)
+    this.logger('Successfully validated transaction schema', transaction)
     return true
   }
 
   validateTransaction({ UTXO, transaction }) {
-    logger.info('Validating transaction', transaction)
+    this.logger('Validating transaction', transaction)
     const isValid = _.every([
       this.validateTransactionSchema(transaction),
       this.validateTransactionSignatures({ UTXO, transaction })
@@ -91,11 +91,11 @@ export class TransactionManager {
 
 
     if (!isValid) {
-      logger.info('Failed to validate the transaction', transaction)
+      this.logger('Failed to validate the transaction', transaction)
       return false
     }
 
-    logger.info('Successfully validated the transaction', transaction)
+    this.logger('Successfully validated the transaction', transaction)
     return true
   }
 
@@ -105,12 +105,12 @@ export class TransactionManager {
     try {
       outputObject = UTXO[txid][index]
     } catch {
-      logger.info('Could not find output object in UTXO')
+      this.logger('Could not find output object in UTXO')
       return false
     }
 
     if (!outputObject) {
-      logger.info('Could not find output object in UTXO')
+      this.logger('Could not find output object in UTXO')
       return false
     }
 
@@ -118,7 +118,7 @@ export class TransactionManager {
   }
 
   createTransaction({ keyPair, wallet, UTXO, receiverPublicKey, amount }) {
-    logger.info('Creating a transaction')
+    this.logger('Creating a transaction')
     const transactionToSign = {
       type: 'transaction',
       inputs: [],
@@ -152,13 +152,13 @@ export class TransactionManager {
     })
 
     if (amountLeft > 0) {
-      logger.info(`This transaction has change (${amountLeft} picabus)`)
+      this.logger(`This transaction has change (${amountLeft} picabus)`)
       transactionToSign.outputs.push({
         pubkey: keyPair.publicKey,
         value: totalAmount - amount
       })
     } else {
-      logger.info('This transaction does not have change')
+      this.logger('This transaction does not have change')
     }
 
     const signedTransaction = _.cloneDeep(transactionToSign)
@@ -167,9 +167,13 @@ export class TransactionManager {
       signedTransaction.inputs[inputIndex].sig = signMessage({ message: transactionToSign, privateKey: keyPair.privateKey })
     })
 
-    logger.info('The transaction was signed')
+    this.logger('The transaction was signed')
 
     return new Transaction(signedTransaction)
+  }
+
+  logger(message, ...args) {
+    logger.info(`${colorizeTransactionManager()}: ${message}`, ...args)
   }
 }
 
