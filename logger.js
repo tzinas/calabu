@@ -3,11 +3,12 @@ const { transports, createLogger } = winston.default
 const { combine, colorize, splat, timestamp, printf } = winston.default.format
 
 const formatter = printf(
-  info =>
-  `${info.timestamp} ${info.level}: ${info.message}`+(info.splat!==undefined?`${info.splat}`:" ")
+  info => {
+		return `${info.timestamp} ${info.level}: ${info.message}`
+	}
 )
 
-const logger = createLogger({
+export const logger = createLogger({
 	level: 'debug',
 	format: combine(
 	  splat(),
@@ -28,4 +29,15 @@ const logger = createLogger({
 	],
 })
 
-export default logger
+const orange = '\x1B[38;2;255;207;84m'
+const aqua = '\x1B[38;2;61;255;155m'
+
+const end = '\x1B[39m'
+
+export const colorizeAddress = (address) => {
+	return orange + address + end
+}
+
+export const colorizedPeerManager = () => {
+	return aqua + '$calabu_peer_manager' + end
+}

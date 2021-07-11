@@ -1,5 +1,7 @@
 import canonicalize from './canonicalize.js'
 import db from './db.js'
+import { Transaction } from './transactions.js'
+import { logger, colorizeAddress, colorizedPeerManager } from './logger.js'
 
 const VERSION = '0.5.0'
 
@@ -10,7 +12,7 @@ export class PeerManager {
   async loadKnownPeers() {
     try {
       const storedPeers = JSON.parse(await db.get('knownpeers'))
-      this.logger(`Fetched this peers from the db`, storedPeers)
+      this.logger(`Fetched ${Object.keys(storedPeers).length} peers from the db`)
 
       this.knownPeers = {}
 
@@ -30,7 +32,7 @@ export class PeerManager {
     if (!this.knownPeers[newPeer.address]) {
       this.knownPeers[newPeer.address] = newPeer
 
-      this.logger('Adding new peer', newPeer)
+      this.logger('Adding new peer %O', newPeer)
       db.put('knownpeers', JSON.stringify(this.knownPeers))
     }
   }
@@ -46,9 +48,7 @@ export class PeerManager {
   }
 
   logger(message, ...args) {
-    const now = new Date()
-
-    console.log(`${now.toUTCString()} - $calabu_peer_manager: ${message}`, ...args)
+    logger.info(`${colorizedPeerManager()}: ${message}`, ...args)
   }
 }
 
@@ -62,11 +62,13 @@ export class ConnectedPeer extends Peer {
   buffer = ''
   agent
   peerManager
+  transactionManager
 
-  constructor(socket, peerManager, objectManager) {
+  constructor({ socket, peerManager, objectManager, transactionManager }) {
     super()
     this.socket = socket
     this.peerManager = peerManager
+    this.transactionManager = transactionManager
     this.objectManager = objectManager
     this.address = `${this.socket.remoteAddress}:${this.socket.remotePort}`
     this.peerManager.addNewConnectedPeer(this)
@@ -87,7 +89,7 @@ export class ConnectedPeer extends Peer {
           this.socket.destroy()
           return
         }
-        this.logger('Message: ', messageObject)
+        this.logger('Message: %O', canonicalize(messageObject))
 
         this.handleMessage(messageObject)
       })
@@ -109,7 +111,7 @@ export class ConnectedPeer extends Peer {
       agent: `tzinas/calabu/${VERSION}`
     }
 
-    this.logger('Sending Hello')
+    this.logger(`Sending Hello`)
     this.send(helloMessage)
   }
 
@@ -118,25 +120,6 @@ export class ConnectedPeer extends Peer {
 
     this.logger('Sending getpeers')
     this.send(getPeersMessage)
-  }
-
-  sendRandomObject() {
-    const objectToSend = {
-      "type": "object",
-      "object": {
-        "type": "block",
-        "txids": [
-          "740bcfb434489a7e17b11bc80200cd3495e87ebf89d0dadb076bc50453590104"
-        ],
-        "nonce": "a26d92800cf58e88a5ecf37156c031a4147c2128beeaf1cca2785c93242a4c8b",
-        "previd": "0024839ec9632d382486ba7aac7e0bda3b4bda1d4bd79be9ae78e7e1e813ddd8",
-        "created": "1622825642",
-        "T": "003a000000000000000000000000000000000000000000000000000000000000"
-      }
-    }
-
-    this.logger(`Sending object: `, objectToSend)
-    this.send(objectToSend)
   }
 
   async sendObject(objectId) {
@@ -179,6 +162,37 @@ export class ConnectedPeer extends Peer {
   async receivedObject(object) {
     const objectId = this.objectManager.getObjectHash(object)
     this.logger(`Received object with id ${objectId}`)
+
+    if (!(await this.objectManager.getObject(objectId))) {
+      return
+    }
+
+    if (object.type === 'transaction') {
+      this.logger(`Received transaction with id ${objectId}`)
+      const transaction = new Transaction(object)
+
+      const isValidTransaction = this.transactionManager.validateTransaction({
+        UTXO: {
+          '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d': {
+            0: {
+              pubkey: "77bd8ef0bf4d9423f3681b01f8b5b4cfdf0ee69fb356a7762589f1b65cdcab63",
+              value: 5
+            }
+          }
+        },
+        transaction
+      })
+
+      if (isValidTransaction) {
+        this.logger(`The transaction is valid`)
+        this.sendIHaveObject(objectId)
+        return
+      }
+
+      this.logger(`The transaction is not valid`)
+      return
+    }
+
     if (await this.objectManager.addObject(object)) {
       this.logger(`Already have object with id ${objectId}`)
     }
@@ -202,7 +216,7 @@ export class ConnectedPeer extends Peer {
       type: 'peers',
       peers: Object.values(this.peerManager.knownPeers).map(info => info.address)
     }
-    this.logger(`Sending this known peers`, peersMessage)
+    this.logger(`Sending this known peers: %O`, canonicalize(peersMessage))
     this.send(peersMessage)
   }
 
@@ -227,7 +241,6 @@ export class ConnectedPeer extends Peer {
       this.logger('Handshake completed')
       this.peerManager.addNewPeer(peer)
       this.getPeers()
-      this.sendRandomObject()
       return
     }
 
@@ -270,7 +283,6 @@ export class ConnectedPeer extends Peer {
   }
 
   logger(message, ...args) {
-    const now = new Date()
-    console.log(`${now.toUTCString()} - ${this.socket.remoteAddress}:${this.socket.remotePort}${this.agent ? ` (${this.agent})`:''}): ${message}`, ...args)
+    logger.info(`${colorizeAddress(`${this.socket.remoteAddress}:${this.socket.remotePort}${this.agent ? ` (${this.agent})`:''}`)}: ${message}`, ...args)
   }
 }

@@ -1,9 +1,8 @@
 import _ from 'lodash'
 import Joi from 'joi'
 import { validateSignature, signMessage } from './utils.js'
-import keyManager from './keys.js'
 
-import logger from './logger.js'
+import { logger } from './logger.js'
 
 const transactionSchema = Joi.object({
   inputs: Joi.array().items(Joi.object({
@@ -41,7 +40,7 @@ export class TransactionManager {
       try {
         prevOutput = UTXO[txid][index]
       } catch {
-        logger.info('Could not find previous output txid', prevOutput)
+        logger.info('Could not find previous output txid: %O', prevOutput)
         return false
       }
 
