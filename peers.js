@@ -3,6 +3,7 @@ import net from 'net'
 import canonicalize from './canonicalize.js'
 import db from './db.js'
 import { Transaction, TransactionManager } from './transactions.js'
+import { Block, BlockManager } from './blocks.js'
 import { logger, colorizeAddress, colorizedPeerManager } from './logger.js'
 import { isNormalInteger } from './utils.js'
 import { ObjectManager } from './objects.js'
@@ -102,6 +103,9 @@ export class ConnectedPeer extends Peer {
   agent
   peerManager
   transactionManager
+  blockManager
+  objectManager
+  pendingTransactionRequests = {}
 
   constructor({ socket, peerManager, objectManager, transactionManager }) {
     super()
@@ -109,10 +113,15 @@ export class ConnectedPeer extends Peer {
     this.peerManager = peerManager
     this.transactionManager = transactionManager
     this.objectManager = objectManager
+    this.blockManager = new BlockManager
     this.address = `${this.socket.remoteAddress}:${this.socket.remotePort}`
     this.peerManager.addNewConnectedPeer(this)
     this.logger(`Peer connected`)
     this.sendHello()
+
+    this.requestObject = this.requestObject.bind(this)
+    this.addPendingTransactionRequest = this.addPendingTransactionRequest.bind(this)
+    this.receivedObject = this.receivedObject.bind(this)
 
     socket.on('data', data => {
       this.buffer += data
@@ -184,7 +193,7 @@ export class ConnectedPeer extends Peer {
       objectid: objectId
     }
 
-    this.logger(`Requesting object with id ${objectId}`)
+    this.logger(`Requesting object with id ${objectId}: %O`, objectId)
     this.send(requestedObject)
   }
 
@@ -198,18 +207,32 @@ export class ConnectedPeer extends Peer {
     this.peerManager.broadcast(iHaveObject)
   }
 
-  async receivedObject(object) {
-    const objectId = this.objectManager.getObjectHash(object)
-    this.objectManager.logger(`Received object with id ${objectId}`)
-
-    if (await this.objectManager.getObject(objectId)) {
-      this.objectManager.logger(`Already have the object with id ${objectId}`)
+  addPendingTransactionRequest({ txid, resolve }) {
+    if (this.pendingTransactionRequests[txid]) {
       return
     }
 
+    this.pendingTransactionRequests[txid] = resolve
+  }
+
+  async receivedObject(object) {
+    const objectId = this.objectManager.getObjectHash(object)
+    this.objectManager.logger(`Received object with id: ${objectId}`)
+
+    if (await this.objectManager.getObject(objectId)) {
+      this.objectManager.logger(`Already have the object with id: ${objectId}`)
+      //return
+    }
+
     if (object.type === 'transaction') {
-      this.transactionManager.logger(`Received transaction with id ${objectId}`)
+      this.transactionManager.logger(`Received a transaction with id: ${objectId}`)
       const transaction = new Transaction(object)
+
+      const resolveOfPendingTransactionRequest = this.pendingTransactionRequests[objectId]
+      if (resolveOfPendingTransactionRequest) {
+        this.blockManager.logger(`Resolved request for transaction: ${objectId}`)
+        resolveOfPendingTransactionRequest(transaction)
+      }
 
       const isValidTransaction = this.transactionManager.validateTransaction({
         UTXO: {},
@@ -223,6 +246,19 @@ export class ConnectedPeer extends Peer {
       }
 
       return
+    }
+
+    if (object.type === 'block') {
+      this.blockManager.logger(`Received a block with id: ${objectId}`)
+
+      const block = new Block(object)
+
+      const isValidBlock = await this.blockManager.validateBlock({
+        block,
+        requestObject: this.requestObject,
+        addPendingTransactionRequest: this.addPendingTransactionRequest
+      })
+
     }
   }
 
@@ -249,11 +285,13 @@ export class ConnectedPeer extends Peer {
   }
 
   handleMessage(message) {
+    /*
     if (!this.handshakeCompleted && message.type !== 'hello') {
       this.logger(`Received message of type ${message.type} before handshake`)
       this.socket.destroy()
       return
     }
+    */
 
     if (message.type === 'hello') {
       if (message.version !== VERSION) {
