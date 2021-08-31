@@ -3,9 +3,11 @@ import sha256 from 'sha256'
 import _ from 'lodash'
 import canonicalize from './canonicalize.js'
 import { logger, colorizeBlockManager } from './logger.js'
+import { TransactionManager } from './transactions.js'
 
 const TARGET_T = '00000002af000000000000000000000000000000000000000000000000000000'
-const transactionWaitTimeout = 50000
+const GENESIS_BLOCK_HASH = '00000000a420b7cefa2b7730243316921ed59ffe836e111ca3801f82a4f5360e'
+const promiseWaitTimeout = 50000
 
 const blockSchema = Joi.object({
   txids: Joi.array().items(Joi.string().hex()),
@@ -18,12 +20,17 @@ const blockSchema = Joi.object({
 })
 
 export class BlockManager {
+  transactionManager
+
   constructor() {
     this.logger = this.logger.bind(this)
+    this.transactionManager = new TransactionManager
   }
 
-  async validateBlockTransactions({ block, requestObject, addPendingTransactionRequest }) {
-    block.txids.map(async txid => {
+  async validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO }) {
+    let currentUTXO = _.clone(UTXO)
+
+    for (const txid of block.txids) {
       this.logger('Requesting transaction: %O', txid)
       requestObject(txid)
 
@@ -31,22 +38,35 @@ export class BlockManager {
       try {
         const transaction = await new Promise((resolve, reject) => {
           this.logger('Adding pending object request for transaction: %O', txid)
-          addPendingTransactionRequest({ txid, resolve })
+          addPendingObjectRequest({ id: txid, resolve })
   
           setTimeout(() => {
             reject(new Error('Timeout waiting for transaction: %O', txid));
-          }, transactionWaitTimeout)
+          }, promiseWaitTimeout)
         })
         this.logger('Got this transaction: %O', transaction)
-      } catch (e) {
-        this.logger('There was an error with the promise of transaction: %O', txid)
-      }
+        this.logger('Current UTXO: %O', currentUTXO)
 
-    })
+        const isTransactionValid = this.transactionManager.validateTransaction({ UTXO: currentUTXO, transaction })
+        if (!isTransactionValid) {
+          this.logger('Failed block transaction validation')
+          return false
+        }
+        currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction })
+        this.logger('New UTXO: %O', currentUTXO)
+      } catch (e) {
+        this.logger('There was an error with transaction: %O', txid)
+        this.logger('Failed block transaction validation')
+        return false
+      }
+    }
+
+    this.logger('Block transactions successfully validated')
+    return true
   }
 
-  validatePoW(block) {
-    const blockObject = {
+  getBlockObject(block) {
+    return {
       type: 'block',
       txids: block.txids,
       nonce: block.nonce,
@@ -56,10 +76,16 @@ export class BlockManager {
       miner: block.miner,
       note: block.note
     }
+  }
 
-    const blockHash = sha256(canonicalize(blockObject))
+  getBlockHash(block) {
+    const blockObject = this.getBlockObject(block)
+    return sha256(canonicalize(blockObject))
+  }
+
+  validatePoW(block) {
+    const blockHash = this.getBlockHash(block)
     this.logger('Block hash is: %O', blockHash)
-
 
     if (blockHash >= TARGET_T) {
       this.logger('Block does not satisfy PoW')
@@ -77,18 +103,77 @@ export class BlockManager {
       return false
     }
 
-    this.logger('Successfully validated block schema')
+    this.logger('Successfully validated block schema for block: %O', this.getBlockHash(block))
     return true
   }
 
-  async validateBlock({ block, requestObject, addPendingTransactionRequest }) {
+  isGenesisBlock(block) {
+    const blockObject = this.getBlockObject(block)
+    const blockHash = sha256(canonicalize(blockObject))
+
+    if (blockHash === GENESIS_BLOCK_HASH) {
+      this.logger('Found the genesis block')
+    }
+
+    return blockHash === GENESIS_BLOCK_HASH
+  }
+
+  async validateBlock({ block, requestObject, addPendingObjectRequest }) {
+    this.logger('Now validating block: %O', block)
+    if (this.isGenesisBlock(block)) {
+      return {}
+    }
+
+    this.logger('Requesting previous block: %O', block.previd)
+
+    if (!block.previd) {
+      this.logger('Wrong genesis block: %O', this.getBlockHash(block))
+      return false
+    }
+
+    requestObject(block.previd)
+
+    this.logger('Creating promise for previous block: %O', block.previd)
+    let previousBlock
+
+    try {
+      previousBlock = await new Promise((resolve, reject) => {
+        this.logger('Adding pending object request for previous block: %O', block.previd)
+        addPendingObjectRequest({ id: block.previd, resolve })
+
+        setTimeout(() => {
+          reject(new Error('Timeout waiting for previous block: %O', block.previd));
+        }, promiseWaitTimeout)
+      })
+      this.logger('Got this previous block: %O', previousBlock)
+    } catch (e) {
+      this.logger('There was an error with the promise of the previous block: %O', block.previd)
+      return false
+    }
+
+
+    const currentUTXO = await this.validateBlock({ block: previousBlock, requestObject, addPendingObjectRequest })
+
+    if (!currentUTXO) {
+      this.logger('Failed validation for block: %O', this.getBlockHash(block))
+      return false
+    }
+
     const isValid = _.every([
       this.validateBlockSchema(block),
       //this.validatePoW(block),
-      await this.validateBlockTransactions({ block, requestObject, addPendingTransactionRequest })
+      await this.validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO: currentUTXO }),
     ], validation => {
       return validation
     })
+
+    if (!isValid) {
+      this.logger('Failed validation for block: %O', this.getBlockHash(block))
+      return false
+    }
+
+    this.logger('Successfully validated block: %O', this.getBlockHash(block))
+    return true
   }
 
   logger(message, ...args) {

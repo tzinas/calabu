@@ -3,6 +3,7 @@ import Joi from 'joi'
 import { validateSignature, signMessage } from './utils.js'
 
 import { logger, colorizeTransactionManager } from './logger.js'
+import { ObjectManager } from './objects.js'
 
 const transactionSchema = Joi.object({
   inputs: Joi.array().items(Joi.object({
@@ -21,12 +22,20 @@ const transactionSchema = Joi.object({
 export class TransactionManager {
   objectManager
 
-  constructor(objectManager) {
-    this.objectManager = objectManager
+  constructor() {
+    this.objectManager = new ObjectManager()
+  }
+
+  getTransactionObject(transaction) {
+    return {
+      type: 'transaction',
+      inputs: transaction.inputs,
+      outputs: transaction.outputs
+    }
   }
 
   validateTransactionSignatures({ UTXO, transaction }) {
-    const message = {
+    const messageObject = {
       type: 'transaction',
       inputs: transaction.inputs.map(input => ({outpoint: input.outpoint, sig: null })),
       outputs: transaction.outputs
@@ -42,8 +51,8 @@ export class TransactionManager {
         return false
       }
 
-      const isValidSignature = validateSignature({ message, signature: input.sig,
-                                          publicKey: prevOutput.pubkey })
+      const isValidSignature = validateSignature({ message: messageObject, signature: input.sig,
+                                                   publicKey: prevOutput.pubkey })
 
       if (!isValidSignature) {
         return false
@@ -76,17 +85,18 @@ export class TransactionManager {
   validateTransactionConservation({ UTXO, transaction }) {
     let inputAmount = 0
     let outputAmount = 0
-    transaction.inputs.forEach(input => {
+    for (const input of transaction.inputs) {
       const txid = input.outpoint.txid
       const index = input.outpoint.index
 
       const prevOutput = this.getOutputFromUTXO({ UTXO, txid, index })
 
       if (!prevOutput) {
-        return
+        return false
       }
+
       inputAmount += prevOutput.value
-    })
+    }
 
     transaction.outputs.forEach(output => {
       outputAmount += output.value
@@ -99,6 +109,37 @@ export class TransactionManager {
 
     this.logger(`Successfully validated transaction' s law of conservation`, transaction)
     return true
+  }
+
+  getNewUTXO({ UTXO, transaction }) {
+    const newUTXO = _.cloneDeep(UTXO)
+    transaction.inputs.forEach(input => {
+      const txid = input.outpoint.txid
+      const index = input.outpoint.index
+
+      try {
+        delete newUTXO[txid][index]
+
+        if (_.isEmpty(newUTXO[txid])) {
+          delete newUTXO[txid]
+        }
+      } catch {
+        return false
+      }
+    })
+
+    const transactionObject = this.getTransactionObject(transaction)
+    const transactionId = this.objectManager.getObjectHash(transactionObject)
+
+    transaction.outputs.forEach((output, outputIndex) => {
+      if (!newUTXO[transactionId]) {
+        newUTXO[transactionId] = {}
+      }
+
+      newUTXO[transactionId][outputIndex] = output
+    })
+
+    return newUTXO
   }
 
   validateTransaction({ UTXO, transaction }) {

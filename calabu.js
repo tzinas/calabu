@@ -6,7 +6,7 @@ import { TransactionManager, Transaction } from './transactions.js'
 const peerManager = new PeerManager()
 await peerManager.loadKnownPeers()
 const objectManager = new ObjectManager()
-const transactionManager = new TransactionManager(objectManager)
+const transactionManager = new TransactionManager()
 
 const server = net.createServer(socket => {
   new ConnectedPeer({ socket, peerManager, objectManager, transactionManager })

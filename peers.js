@@ -105,7 +105,7 @@ export class ConnectedPeer extends Peer {
   transactionManager
   blockManager
   objectManager
-  pendingTransactionRequests = {}
+  pendingObjectRequests = {}
 
   constructor({ socket, peerManager, objectManager, transactionManager }) {
     super()
@@ -120,7 +120,7 @@ export class ConnectedPeer extends Peer {
     this.sendHello()
 
     this.requestObject = this.requestObject.bind(this)
-    this.addPendingTransactionRequest = this.addPendingTransactionRequest.bind(this)
+    this.addPendingObjectRequest = this.addPendingObjectRequest.bind(this)
     this.receivedObject = this.receivedObject.bind(this)
 
     socket.on('data', data => {
@@ -207,32 +207,44 @@ export class ConnectedPeer extends Peer {
     this.peerManager.broadcast(iHaveObject)
   }
 
-  addPendingTransactionRequest({ txid, resolve }) {
-    if (this.pendingTransactionRequests[txid]) {
+  addPendingObjectRequest({ id, resolve }) {
+    if (this.pendingObjectRequests[id]) {
       return
     }
 
-    this.pendingTransactionRequests[txid] = resolve
+    this.pendingObjectRequests[id] = resolve
   }
 
   async receivedObject(object) {
     const objectId = this.objectManager.getObjectHash(object)
-    this.objectManager.logger(`Received object with id: ${objectId}`)
+    this.objectManager.logger(`Received object(${object.type}) with id: ${objectId}`)
 
     if (await this.objectManager.getObject(objectId)) {
-      this.objectManager.logger(`Already have the object with id: ${objectId}`)
+      this.objectManager.logger(`Already have the object(${object.type}) with id: ${objectId}`)
       //return
     }
+
+    const resolveOfPendingObjectRequest = this.pendingObjectRequests[objectId]
+    if (resolveOfPendingObjectRequest) {
+      this.blockManager.logger(`Resolving request for object(${object.type}): ${objectId}`)
+      if (object.type === 'transaction') {
+        resolveOfPendingObjectRequest(new Transaction(object))
+      }
+
+      if (object.type === 'block') {
+        resolveOfPendingObjectRequest(new Block(object))
+      }
+
+      delete this.pendingObjectRequests[objectId]
+
+      this.objectManager.logger(`No additional checks will be made for object(${object.type}): ${objectId}`)
+      return
+    }
+
 
     if (object.type === 'transaction') {
       this.transactionManager.logger(`Received a transaction with id: ${objectId}`)
       const transaction = new Transaction(object)
-
-      const resolveOfPendingTransactionRequest = this.pendingTransactionRequests[objectId]
-      if (resolveOfPendingTransactionRequest) {
-        this.blockManager.logger(`Resolved request for transaction: ${objectId}`)
-        resolveOfPendingTransactionRequest(transaction)
-      }
 
       const isValidTransaction = this.transactionManager.validateTransaction({
         UTXO: {},
@@ -256,9 +268,8 @@ export class ConnectedPeer extends Peer {
       const isValidBlock = await this.blockManager.validateBlock({
         block,
         requestObject: this.requestObject,
-        addPendingTransactionRequest: this.addPendingTransactionRequest
+        addPendingObjectRequest: this.addPendingObjectRequest
       })
-
     }
   }
 
