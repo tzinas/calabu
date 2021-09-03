@@ -30,8 +30,13 @@ export class ObjectManager {
       this.logger(`Object with id ${objectId} already exists and cannot be added`)
       return false
     }
-    await db.put(`object/${objectId}`, JSON.stringify(object))
-    this.logger(`Added object with id ${objectId}`)
+    try {
+      await db.put(`object/${objectId}`, JSON.stringify(object))
+      this.logger(`Added object: ${objectId}`)
+    } catch {
+      this.logger(`Error adding object: ${objectId}`)
+      return false
+    }
     return true
   }
 

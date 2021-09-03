@@ -30,7 +30,11 @@ export class PeerManager {
       }
     } catch {
       this.logger(`No stored peers`)
-      db.put('knownpeers', JSON.stringify({}))
+      try {
+        db.put('knownpeers', JSON.stringify({}))
+      } catch {
+        this.logger(`Error storing peers`)
+      }
     }
   }
 
@@ -71,7 +75,11 @@ export class PeerManager {
 
     this.knownPeers[newPeer.address] = newPeer
 
-    db.put('knownpeers', JSON.stringify(this.knownPeers))
+    try {
+      db.put('knownpeers', JSON.stringify(this.knownPeers))
+    } catch {
+      this.logger(`Error adding peer`)
+    }
     this.logger(`Added new peer ${colorizeAddress(newPeer.address)}`)
 
     return newPeer
