@@ -1,4 +1,3 @@
-import { ObjectManager } from '../objects.js'
 import { TransactionManager, Transaction } from '../transactions.js'
 import { logger } from '../logger'
 
@@ -9,8 +8,7 @@ beforeAll(() => {
 })
 
 test('validate correct transaction', () => {
-  const objectManager = new ObjectManager()
-  const transactionManager = new TransactionManager(objectManager)
+  const transactionManager = new TransactionManager()
 
   const transaction = new Transaction({
     type: "transaction", 
@@ -44,8 +42,7 @@ test('validate correct transaction', () => {
 })
 
 test('validate wrong transaction', () => {
-  const objectManager = new ObjectManager()
-  const transactionManager = new TransactionManager(objectManager)
+  const transactionManager = new TransactionManager()
 
   const transaction = new Transaction({
     type: "transaction", 
@@ -79,8 +76,7 @@ test('validate wrong transaction', () => {
 })
 
 test('check transaction wrong conservation', () => {
-  const objectManager = new ObjectManager()
-  const transactionManager = new TransactionManager(objectManager)
+  const transactionManager = new TransactionManager()
 
   const transaction = new Transaction({
     type: "transaction",
@@ -114,8 +110,7 @@ test('check transaction wrong conservation', () => {
 
 
 test('try creating transaction with not available balance', () => {
-  const objectManager = new ObjectManager()
-  const transactionManager = new TransactionManager(objectManager)
+  const transactionManager = new TransactionManager()
 
   expect(() => {
     transactionManager.createTransaction({
@@ -156,8 +151,7 @@ test('try creating transaction with not available balance', () => {
 })
 
 test('create transaction and validate', () => {
-  const objectManager = new ObjectManager()
-  const transactionManager = new TransactionManager(objectManager)
+  const transactionManager = new TransactionManager()
 
   const UTXO = {
     '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d':
