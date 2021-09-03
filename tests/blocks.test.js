@@ -12,13 +12,11 @@ const GENESIS_BLOCK = new Block({
   type: "block"
 })
 
-/*
 beforeAll(() => {
   logger.transports.forEach(transport => {
     transport.silent = true
   })
 })
-*/
 
 
 test('validate correct block schema', () => {
@@ -33,6 +31,14 @@ test('validate PoW', () => {
   const blockManager = new BlockManager()
 
   const isValid = blockManager.validatePoW(GENESIS_BLOCK)
+
+  expect(isValid).toBe(true)
+})
+
+test('validate is genesis block', () => {
+  const blockManager = new BlockManager()
+
+  const isValid = blockManager.isGenesisBlock(GENESIS_BLOCK)
 
   expect(isValid).toBe(true)
 })
