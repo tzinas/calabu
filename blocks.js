@@ -30,6 +30,8 @@ export class BlockManager {
   async validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO }) {
     let currentUTXO = _.clone(UTXO)
 
+    const transactions = []
+
     for (const txid of block.txids) {
       this.logger('Requesting transaction: %O', txid)
       requestObject(txid)
@@ -44,21 +46,50 @@ export class BlockManager {
             reject(new Error('Timeout waiting for transaction: %O', txid));
           }, promiseWaitTimeout)
         })
-        this.logger('Got this transaction: %O', transaction)
-        this.logger('Current UTXO: %O', currentUTXO)
 
-        const isTransactionValid = this.transactionManager.validateTransaction({ UTXO: currentUTXO, transaction })
-        if (!isTransactionValid) {
-          this.logger('Failed block transaction validation')
-          return false
-        }
-        currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction })
-        this.logger('New UTXO: %O', currentUTXO)
+        this.logger('Got this transaction: %O', transaction)
+
+        transactions.push(transaction)
       } catch (e) {
         this.logger('There was an error with transaction: %O', txid)
         this.logger('Failed block transaction validation')
         return false
       }
+    }
+
+    if (transactions.length === 0) {
+      this.logger('No transactions in this block')
+      return true
+    }
+
+    const coinbaseTransaction = transactions[0]
+
+    if (this.transactionManager.validateCoinbaseTransactionSchema(coinbaseTransaction)) {
+      this.logger('This block has a coinbase transaction')
+
+      transactions.splice(0, 1) //remove the coinbase transaction from the rest of the transactions
+
+      if (!this.transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: transactions, UTXO: currentUTXO })) {
+        this.logger('Incorrect coinbase transaction for this block')
+        return false
+      }
+
+      currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction: coinbaseTransaction })
+      this.logger('New UTXO: %O', currentUTXO)
+
+    } else {
+      this.logger('This block does not have a coinbase transaction')
+    }
+
+    for (const transaction of transactions) {
+      const isTransactionValid = this.transactionManager.validateTransaction({ UTXO: currentUTXO, transaction })
+      if (!isTransactionValid) {
+        this.logger('Failed block transaction validation')
+        return false
+      }
+
+      currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction })
+      this.logger('New UTXO: %O', currentUTXO)
     }
 
     this.logger('Block transactions successfully validated')
@@ -120,16 +151,17 @@ export class BlockManager {
 
   async validateBlock({ block, requestObject, addPendingObjectRequest }) {
     this.logger('Now validating block: %O', block)
+
     if (this.isGenesisBlock(block)) {
       return {}
     }
-
-    this.logger('Requesting previous block: %O', block.previd)
 
     if (!block.previd) {
       this.logger('Wrong genesis block: %O', this.getBlockHash(block))
       return false
     }
+
+    this.logger('Requesting previous block: %O', block.previd)
 
     requestObject(block.previd)
 
@@ -159,16 +191,17 @@ export class BlockManager {
       return false
     }
 
-    const isValid = _.every([
-      this.validateBlockSchema(block),
-      //this.validatePoW(block),
-      await this.validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO: currentUTXO }),
-    ], validation => {
-      return validation
-    })
+    if (!this.validateBlockSchema(block)) {
+      return false
+    }
 
-    if (!isValid) {
-      this.logger('Failed validation for block: %O', this.getBlockHash(block))
+    /*
+    if (!this.validatePoW(block)) {
+      return false
+    }
+    */
+
+    if (!await this.validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO: currentUTXO })) {
       return false
     }
 

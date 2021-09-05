@@ -35,7 +35,7 @@ test('validate PoW', () => {
   expect(isValid).toBe(true)
 })
 
-test('validate is genesis block', () => {
+test('validate correct genesis block', () => {
   const blockManager = new BlockManager()
 
   const isValid = blockManager.isGenesisBlock(GENESIS_BLOCK)
