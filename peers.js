@@ -178,6 +178,14 @@ export class ConnectedPeer extends Peer {
     this.send(getPeersMessage)
   }
 
+  getChainTip() {
+    const getChainTipMessage = {type: 'getchaintip'}
+
+    this.logger('Sending getchaintip')
+    this.send(getChainTipMessage)
+  }
+
+
   async sendObject(objectId) {
     const object = await this.objectManager.getObject(objectId)
 
@@ -303,6 +311,10 @@ export class ConnectedPeer extends Peer {
     this.send(peersMessage)
   }
 
+  sendChainTip() {
+
+  }
+
   handleMessage(message) {
     /*
     if (!this.handshakeCompleted && message.type !== 'hello') {
@@ -330,6 +342,7 @@ export class ConnectedPeer extends Peer {
       }
 
       this.getPeers()
+      this.getChainTip()
       return
     }
 
@@ -375,6 +388,10 @@ export class ConnectedPeer extends Peer {
     if (message.type === 'ihaveobject') {
       this.handleIHaveObject(message.objectid)
       return
+    }
+
+    if (message.type === 'getchaintip') {
+      this.sendChainTip()
     }
 
     this.logger(`Unknown message type ${message.type}`)
