@@ -6,8 +6,7 @@ import { logger, colorizeBlockManager } from './logger.js'
 import { TransactionManager } from './transactions.js'
 
 const TARGET_T = '00000002af000000000000000000000000000000000000000000000000000000'
-const GENESIS_BLOCK_HASH = '00000000a420b7cefa2b7730243316921ed59ffe836e111ca3801f82a4f5360e'
-const promiseWaitTimeout = 50000
+export const GENESIS_BLOCK_HASH = '00000000a420b7cefa2b7730243316921ed59ffe836e111ca3801f82a4f5360e'
 
 const blockSchema = Joi.object({
   txids: Joi.array().items(Joi.string().hex()),
@@ -25,30 +24,22 @@ export class BlockManager {
   constructor() {
     this.logger = this.logger.bind(this)
     this.transactionManager = new TransactionManager
+
+    this.getBlockHash = this.getBlockHash.bind(this)
+    this.getBlockObject = this.getBlockObject.bind(this)
   }
 
-  async validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO }) {
+  async validateBlockTransactions({ block, requestObject, UTXO }) {
     let currentUTXO = _.clone(UTXO)
 
     const transactions = []
 
     for (const txid of block.txids) {
       this.logger('Requesting transaction: %O', txid)
-      requestObject(txid)
-
-      this.logger('Creating promise for transaction: %O', txid)
+      let transaction
       try {
-        const transaction = await new Promise((resolve, reject) => {
-          this.logger('Adding pending object request for transaction: %O', txid)
-          addPendingObjectRequest({ id: txid, resolve })
-  
-          setTimeout(() => {
-            reject(new Error('Timeout waiting for transaction: %O', txid));
-          }, promiseWaitTimeout)
-        })
-
+        transaction = await requestObject(txid)
         this.logger('Got this transaction: %O', transaction)
-
         transactions.push(transaction)
       } catch (e) {
         this.logger('There was an error with transaction: %O', txid)
@@ -156,8 +147,12 @@ export class BlockManager {
     return blockHash === GENESIS_BLOCK_HASH
   }
 
-  async validateBlock({ block, requestObject, addPendingObjectRequest }) {
+  async validateBlock({ block, requestObject }) {
     this.logger('Now validating block: %O', block)
+
+    if (!this.validateBlockSchema(block)) {
+      return false
+    }
 
     if (this.isGenesisBlock(block)) {
       return {}
@@ -168,47 +163,33 @@ export class BlockManager {
       return false
     }
 
-    this.logger('Requesting previous block: %O', block.previd)
-
-    requestObject(block.previd)
-
-    this.logger('Creating promise for previous block: %O', block.previd)
-    let previousBlock
-
-    try {
-      previousBlock = await new Promise((resolve, reject) => {
-        this.logger('Adding pending object request for previous block: %O', block.previd)
-        addPendingObjectRequest({ id: block.previd, resolve })
-
-        setTimeout(() => {
-          reject(new Error('Timeout waiting for previous block: %O', block.previd));
-        }, promiseWaitTimeout)
-      })
-      this.logger('Got this previous block: %O', previousBlock)
-    } catch (e) {
-      this.logger('There was an error with the promise of the previous block: %O', block.previd)
-      return false
-    }
-
-
-    const currentUTXO = await this.validateBlock({ block: previousBlock, requestObject, addPendingObjectRequest })
-
-    if (!currentUTXO) {
-      this.logger('Failed validation for block: %O', this.getBlockHash(block))
-      return false
-    }
-
-    if (!this.validateBlockSchema(block)) {
-      return false
-    }
-
     /*
     if (!this.validatePoW(block)) {
       return false
     }
     */
 
-    if (!await this.validateBlockTransactions({ block, requestObject, addPendingObjectRequest, UTXO: currentUTXO })) {
+    this.logger('Requesting previous block: %O', block.previd)
+    let previousBlock
+
+    try {
+      previousBlock = await requestObject(block.previd)
+      this.logger('Got this previous block: %O', previousBlock)
+    } catch (e) {
+      this.logger('There was an error with the promise of the previous block: %O %O', block.previd, e)
+      return false
+    }
+
+    const currentUTXO = await this.validateBlock({ block: previousBlock, requestObject })
+
+    if (!currentUTXO) {
+      this.logger('Failed validation for block: %O', this.getBlockHash(block))
+      return false
+    }
+
+
+    if (!await this.validateBlockTransactions({ block, requestObject, UTXO: currentUTXO })) {
+      this.logger('Failed transaction validation for block: %O', this.getBlockHash(block))
       return false
     }
 

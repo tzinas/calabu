@@ -9,6 +9,7 @@ import { isNormalInteger } from './utils.js'
 import { ObjectManager } from './objects.js'
 import _ from 'lodash'
 
+const promiseWaitTimeout = 50000
 const VERSION = '0.5.0'
 
 export class PeerManager {
@@ -128,7 +129,6 @@ export class ConnectedPeer extends Peer {
     this.sendHello()
 
     this.requestObject = this.requestObject.bind(this)
-    this.addPendingObjectRequest = this.addPendingObjectRequest.bind(this)
     this.receivedObject = this.receivedObject.bind(this)
 
     socket.on('data', data => {
@@ -211,6 +211,24 @@ export class ConnectedPeer extends Peer {
 
     this.logger(`Requesting object with id ${objectId}: %O`, objectId)
     this.send(requestedObject)
+
+    if (this.pendingObjectRequests[objectId]) {
+      return this.pendingObjectRequests[objectId]
+    }
+
+    return new Promise((resolve, reject) => {
+      this.pendingObjectRequests[objectId] = (object) => {
+        this.logger('Resolving promise and canceling timeout for object: %O', objectId)
+        resolve(object)
+        clearTimeout(timeout)
+      }
+
+      const timeout = setTimeout(() => {
+        this.logger('Object request promise timed out')
+        delete this.pendingObjectRequests[objectId]
+        reject(new Error('Timeout waiting object: %O', objectId));
+      }, promiseWaitTimeout)
+    })
   }
 
   sendIHaveObject(objectId) {
@@ -221,14 +239,6 @@ export class ConnectedPeer extends Peer {
 
     this.logger(`Advertising object with id ${objectId}`)
     this.peerManager.broadcast(iHaveObject)
-  }
-
-  addPendingObjectRequest({ id, resolve }) {
-    if (this.pendingObjectRequests[id]) {
-      return
-    }
-
-    this.pendingObjectRequests[id] = resolve
   }
 
   async receivedObject(object) {
@@ -283,8 +293,7 @@ export class ConnectedPeer extends Peer {
 
       const isValidBlock = await this.blockManager.validateBlock({
         block,
-        requestObject: this.requestObject,
-        addPendingObjectRequest: this.addPendingObjectRequest
+        requestObject: this.requestObject
       })
     }
   }
