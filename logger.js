@@ -56,3 +56,6 @@ export const colorizeTransactionManager = () => {
 export const colorizeBlockManager = () => {
 	return red + '$calabu_block_manager' + end
 }
+export const colorizeBlockchainManager = () => {
+	return red + '$calabu_blockchain_manager' + end
+}
