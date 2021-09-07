@@ -205,7 +205,7 @@ test('validate correct coinbase transaction', () => {
     }]
   })
 
-  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction })
+  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: [], UTXO: {} })
   expect(isValid).toBe(true)
 })
 
@@ -224,7 +224,7 @@ test('validate wrong coinbase transaction', () => {
     }]
   })
 
-  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction: wrongCoinbaseTransaction })
+  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction: wrongCoinbaseTransaction, normalTransactions: [], UTXO: {} })
   expect(isValid).toBe(false)
 })
 
