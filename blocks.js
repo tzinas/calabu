@@ -97,16 +97,23 @@ export class BlockManager {
   }
 
   getBlockObject(block) {
-    return {
+    const blockObject = {
       type: 'block',
       txids: block.txids,
       nonce: block.nonce,
       previd: block.previd,
       created: block.created,
-      T: block.T,
-      miner: block.miner,
-      note: block.note
+      T: block.T
     }
+
+    if (block.miner) {
+      blockObject.miner = block.miner
+    }
+
+    if (block.note) {
+      blockObject.note = block.note
+    }
+    return blockObject
   }
 
   getBlockHash(block) {
