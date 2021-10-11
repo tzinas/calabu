@@ -1,5 +1,7 @@
+import _ from 'lodash'
+
 import { BlockchainManager } from '../blockchain'
-import { Block, BlockManager } from '../blocks'
+import { Block, BlockManager, GENESIS_BLOCK_HASH } from '../blocks'
 import { logger } from '../logger'
 
 const GENESIS_BLOCK = new Block({ "T": "00000002af000000000000000000000000000000000000000000000000000000", "created": 1624219079, "miner": "dionyziz", "nonce": "0000000000000000000000000000000000000000000000000000002634878840", "note": "The Economist 2021-06-20: Crypto-miners are probably to blame for the graphics-chip shortage", "previd": null, "txids": [], "type": "block" })
@@ -51,4 +53,28 @@ test('find correct height of block', async () => {
   const blockHeight = await blockchainManager.getBlockHeight({ knownHeightBlock: BLOCK_2, ancestorBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), knownHeight: 3, requestObject })
 
   expect(blockHeight).toBe(1)
+})
+
+test('remove blocks from blockchain before block', async () => {
+  const blockchainManager = new BlockchainManager()
+
+  const blockchain = new Set([blockManager.getBlockHash(GENESIS_BLOCK), blockManager.getBlockHash(BLOCK_1), blockManager.getBlockHash(BLOCK_2)])
+  const expectedBlockchain = new Set([blockManager.getBlockHash(GENESIS_BLOCK)])
+
+  const newBlockchain = await blockchainManager.removeOrAddBlocksBefore({ type: 'remove', fromBlock: BLOCK_2, beforeBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), blockchain, requestObject })
+
+  expect(_.isEqual(newBlockchain, expectedBlockchain)).toBe(true)
+})
+
+test('change to longest chain', async () => {
+  logger.transports.forEach(transport => {
+    transport.silent = false
+  })
+
+  const blockchainManager = new BlockchainManager()
+
+  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_3, requestObject })
+  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_2, requestObject })
+
+  expect(true).toBe(true)
 })
