@@ -1,0 +1,6 @@
+.DS_Store
+*.log
+db-calabu/
+node_modules/
+coverage/
+training/
