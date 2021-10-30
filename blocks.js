@@ -178,6 +178,11 @@ export class BlockManager {
       return false
     }
 
+    if (block.created < previousBlock.created) {
+      this.logger('Block timestamp is not ascending')
+      return false
+    }
+
     let currentUTXO = await this.validateBlock({ block: previousBlock, requestObject })
 
     if (!currentUTXO) {
