@@ -1,5 +1,8 @@
 import _ from 'lodash'
 import Joi from 'joi'
+import sha256 from 'sha256'
+
+import canonicalize from './canonicalize.js'
 import { validateSignature, signMessage } from './utils.js'
 
 import { logger, colorizeTransactionManager } from './logger.js'
@@ -17,14 +20,14 @@ const transactionSchema = Joi.object({
   })).required(),
   outputs: Joi.array().items(Joi.object({
     pubkey: Joi.string().hex().required(),
-    value: Joi.number().integer().min(0).required()
+    value: Joi.number().integer().unsafe().min(0).required()
   })).required()
 })
 
 const coinbaseTransactionSchema = Joi.object({
   outputs: Joi.array().length(1).items(Joi.object({
     pubkey: Joi.string().hex().required(),
-    value: Joi.number().integer().min(0).required()
+    value: Joi.number().integer().unsafe().min(0).required()
   })).required()
 })
 
@@ -46,6 +49,11 @@ export class TransactionManager {
     }
 
     return transactionObject
+  }
+
+  getTransactionHash(transaction) {
+    const transactionObject = this.getTransactionObject(transaction)
+    return sha256(canonicalize(transactionObject))
   }
 
   validateTransactionSignatures({ UTXO, transaction }) {
@@ -270,6 +278,9 @@ export class TransactionManager {
     let totalAmount = 0
     wallet[keyPair.publicKey].forEach(output => {
       const outputFromUTXO = this.getOutputFromUTXO({ UTXO, ...output})
+      if (!outputFromUTXO) {
+        throw 'no-utxo-output'
+      }
 
       transactionToSign.inputs.push({
         outpoint: {

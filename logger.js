@@ -34,6 +34,7 @@ const aqua = '\x1B[38;2;61;255;155m'
 const purple = '\x1B[38;2;207;135;255m'
 const blue = '\x1B[38;2;66;176;255m'
 const red = '\x1B[38;2;255;66;82m'
+const pink = '\x1B[38;2;255;0;123m'
 
 const end = '\x1B[39m'
 
@@ -42,7 +43,7 @@ export const colorizeAddress = (address) => {
 }
 
 export const colorizedPeerManager = () => {
-	return aqua + '$calabu_peer_manager' + end
+	return orange + '$calabu_peer_manager' + end
 }
 
 export const colorizeObjectManager = () => {
@@ -54,8 +55,8 @@ export const colorizeTransactionManager = () => {
 }
 
 export const colorizeBlockManager = () => {
-	return red + '$calabu_block_manager' + end
+	return aqua + '$calabu_block_manager' + end
 }
 export const colorizeBlockchainManager = () => {
-	return red + '$calabu_blockchain_manager' + end
+	return pink + '$calabu_blockchain_manager' + end
 }

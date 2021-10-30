@@ -15,6 +15,11 @@ const VERSION = '0.5.0'
 export class PeerManager {
   knownPeers = {}
   connectedPeers = {}
+  blockchainManager
+
+  constructor({ blockchainManager }) {
+    this.blockchainManager = blockchainManager
+  }
 
   async loadKnownPeers() {
     try {
@@ -116,12 +121,12 @@ export class ConnectedPeer extends Peer {
   objectManager
   pendingObjectRequests = {}
 
-  constructor({ socket, peerManager, objectManager, transactionManager }) {
+  constructor({ socket, peerManager }) {
     super()
     this.socket = socket
     this.peerManager = peerManager
-    this.transactionManager = transactionManager
-    this.objectManager = objectManager
+    this.transactionManager = new TransactionManager
+    this.objectManager = new ObjectManager
     this.blockManager = new BlockManager
     this.address = `${this.socket.remoteAddress}:${this.socket.remotePort}`
     this.peerManager.addNewConnectedPeer(this)
@@ -320,6 +325,24 @@ export class ConnectedPeer extends Peer {
     this.send(peersMessage)
   }
 
+  async handleChainTip({ blockId, requestObject }) {
+    this.logger('Received chaintip with id: %O', blockId)
+    if (!this.peerManager.blockchainManager.isBlockInMyBlockchain(blockId)) {
+      this.peerManager.blockchainManager.logger('Chaintip already in the blockchain')
+      return
+    }
+
+    const chainTip = await requestObject(blockId)
+    this.blockManager.logger('Validating the received chaintip')
+    if (!await this.blockManager.validateBlock({ block: chainTip, requestObject })) {
+      return
+    }
+    this.blockManager.logger('Successfully validated the received chaintip: %O', blockId)
+
+    this.peerManager.blockchainManager.logger('Checking to add to blockchain')
+    await this.peerManager.blockchainManager.handleNewValidBlock({ validBlock: chainTip, requestObject })
+  }
+
   sendChainTip() {
 
   }
@@ -401,6 +424,12 @@ export class ConnectedPeer extends Peer {
 
     if (message.type === 'getchaintip') {
       this.sendChainTip()
+      return
+    }
+
+    if (message.type === 'chaintip') {
+      this.handleChainTip({ blockId: message.blockid, requestObject: this.requestObject })
+      return
     }
 
     this.logger(`Unknown message type ${message.type}`)

@@ -1,6 +1,6 @@
 import _ from 'lodash'
 
-import { BlockManager, GENESIS_BLOCK_HASH } from './blocks'
+import { BlockManager, GENESIS_BLOCK_HASH } from './blocks.js'
 import { logger, colorizeBlockchainManager } from './logger.js'
 
 export class BlockchainManager {
@@ -8,6 +8,10 @@ export class BlockchainManager {
   chainHeight = 1
   blockchain = new Set([GENESIS_BLOCK_HASH])
   blockManager = new BlockManager()
+
+  async isBlockInMyBlockchain({ blockId }) {
+    return this.blockchain.has(blockId)
+  }
 
   async getFirstAncestorBlock({ blockchain, otherBlock, requestObject }) {
     const otherBlockHash = this.blockManager.getBlockHash(otherBlock)
@@ -81,8 +85,10 @@ export class BlockchainManager {
 
   async handleNewValidBlock({ validBlock, requestObject }) {
     // check if valid block is already on my chain?
+    this.logger('Received this valid block: %O', validBlock)
     const validBlockHash = this.blockManager.getBlockHash(validBlock)
     if (this.blockchain.has(validBlockHash)) {
+      this.logger('Block already in the blockchain')
       return false
     }
 
@@ -113,6 +119,7 @@ export class BlockchainManager {
     this.logger(`The new chain tip is: %O`, this.chainTip)
     this.logger(`The new chain height is: %O`, this.chainHeight)
     this.logger(`The new blockchain is: %O`, this.blockchain)
+    return true
   }
 
   logger(message, ...args) {

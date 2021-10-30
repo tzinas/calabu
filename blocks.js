@@ -50,7 +50,7 @@ export class BlockManager {
 
     if (transactions.length === 0) {
       this.logger('No transactions in this block')
-      return true
+      return currentUTXO
     }
 
     const coinbaseTransaction = transactions[0]
@@ -59,17 +59,15 @@ export class BlockManager {
       this.logger('This block has a coinbase transaction')
 
       transactions.splice(0, 1) //remove the coinbase transaction from the rest of the transactions
+      currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction: coinbaseTransaction })
+      this.logger('New UTXO: %O', currentUTXO)
 
       if (!this.transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: transactions, UTXO: currentUTXO })) {
         this.logger('Incorrect coinbase transaction for this block')
         return false
       }
-
-      currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction: coinbaseTransaction })
-      this.logger('New UTXO: %O', currentUTXO)
-
     } else {
-      this.logger('This block does not have a coinbase transaction')
+      this.logger('This block does not have a coinbase transaction or it does not have a valid one')
     }
 
     for (const transaction of transactions) {
@@ -84,7 +82,7 @@ export class BlockManager {
     }
 
     this.logger('Block transactions successfully validated')
-    return true
+    return currentUTXO
   }
 
   getBlockObject(block) {
@@ -180,21 +178,22 @@ export class BlockManager {
       return false
     }
 
-    const currentUTXO = await this.validateBlock({ block: previousBlock, requestObject })
+    let currentUTXO = await this.validateBlock({ block: previousBlock, requestObject })
 
     if (!currentUTXO) {
       this.logger('Failed validation for block: %O', this.getBlockHash(block))
       return false
     }
 
-
-    if (!await this.validateBlockTransactions({ block, requestObject, UTXO: currentUTXO })) {
+    currentUTXO = await this.validateBlockTransactions({ block, requestObject, UTXO: currentUTXO })
+    this.logger('Current UTXO: %O', currentUTXO)
+    if (!currentUTXO) {
       this.logger('Failed transaction validation for block: %O', this.getBlockHash(block))
       return false
     }
 
     this.logger('Successfully validated block: %O', this.getBlockHash(block))
-    return true
+    return currentUTXO
   }
 
   logger(message, ...args) {
