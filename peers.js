@@ -344,7 +344,13 @@ export class ConnectedPeer extends Peer {
   }
 
   sendChainTip() {
+    const chainTipMessage = {
+      type: 'chaintip',
+      blockid: this.peerManager.blockchainManager.chainTip
+    }
 
+    this.logger(`Sending chain tip: %O`, chainTipMessage.blockid)
+    this.send(chainTipMessage)
   }
 
   handleMessage(message) {
