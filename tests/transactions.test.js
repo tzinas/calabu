@@ -118,16 +118,6 @@ test('try creating transaction with not available balance', () => {
         publicKey: '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5',
         privateKey: 'b8a4eb6b6cb68b833a00e691e8dc9fe70ef55374d7588aeb838ef9431ba136a46a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5'
       },
-      wallet: {
-        '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5': [{
-          txid: '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d',
-          index: 0
-        },
-        {
-          txid: '92532015dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d',
-          index: 4
-        }]
-      },
       UTXO: {
         '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d':
         {
@@ -174,16 +164,6 @@ test('create transaction and validate', () => {
     keyPair: {
       publicKey: '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5',
       privateKey: 'b8a4eb6b6cb68b833a00e691e8dc9fe70ef55374d7588aeb838ef9431ba136a46a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5'
-    },
-    wallet: {
-      '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5': [{
-        txid: '5c532068dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d',
-        index: 0
-      },
-      {
-        txid: '92532015dcbedde528e788eb8a36f44110162685572d5834c81b50af6d27390d',
-        index: 4
-      }]
     },
     UTXO,
     receiverPublicKey: 'a71a1d74e700898209f776c9f71220f8360411277f5c7b792c67a807d8aa326c',

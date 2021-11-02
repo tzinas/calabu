@@ -267,7 +267,7 @@ export class TransactionManager {
     return outputObject
   }
 
-  createTransaction({ keyPair, wallet, UTXO, receiverPublicKey, amount, fee }) {
+  createTransaction({ keyPair, UTXO, receiverPublicKey, amount, fee }) {
     this.logger('Creating a transaction')
     const transactionToSign = {
       type: 'transaction',
@@ -276,21 +276,23 @@ export class TransactionManager {
     }
 
     let totalAmount = 0
-    wallet[keyPair.publicKey].forEach(output => {
-      const outputFromUTXO = this.getOutputFromUTXO({ UTXO, ...output})
-      if (!outputFromUTXO) {
-        throw 'no-utxo-output'
+    for (const [txid, outputs] of Object.entries(UTXO)) {
+      for (const [index, output] of Object.entries(outputs)) {
+        if (output.pubkey !== keyPair.publicKey) {
+          continue
+        }
+
+        transactionToSign.inputs.push({
+          outpoint: {
+            txid,
+            index
+          },
+          sig: null
+        })
+
+      totalAmount += output.value
       }
-
-      transactionToSign.inputs.push({
-        outpoint: {
-          ...output
-        },
-        sig: null
-      })
-
-      totalAmount += outputFromUTXO.value
-    })
+    }
 
     let amountLeft = totalAmount - amount
 

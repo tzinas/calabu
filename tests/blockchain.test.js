@@ -36,12 +36,6 @@ const TRANSACTION_1 = transactionManager.createTransaction({
     publicKey: '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5',
     privateKey: 'b8a4eb6b6cb68b833a00e691e8dc9fe70ef55374d7588aeb838ef9431ba136a46a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5'
   },
-  wallet: {
-    '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5': [{
-      txid: transactionManager.getTransactionHash(COINBASE_1),
-      index: 0
-    }]
-  },
   UTXO,
   receiverPublicKey: '1d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb',
   amount: 3000000,
@@ -53,12 +47,6 @@ const TRANSACTION_2 = transactionManager.createTransaction({
   keyPair: {
     publicKey: '1d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb',
     privateKey: '4addab16b2ff83f1b407c72f6c0a3c7ed281f43632ee7ed62eacfc30422412261d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb'
-  },
-  wallet: {
-    '1d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb': [{
-      txid: transactionManager.getTransactionHash(TRANSACTION_1),
-      index: 0
-    }]
   },
   UTXO,
   receiverPublicKey: '6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5',
