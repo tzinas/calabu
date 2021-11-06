@@ -28,7 +28,8 @@ const coinbaseTransactionSchema = Joi.object({
   outputs: Joi.array().length(1).items(Joi.object({
     pubkey: Joi.string().hex().required(),
     value: Joi.number().integer().unsafe().min(0).required()
-  })).required()
+  })).required(),
+  height: Joi.number().integer().min(1).required()
 })
 
 export class TransactionManager {
@@ -234,10 +235,22 @@ export class TransactionManager {
     return true
   }
 
-  validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions, UTXO }) {
+  validateCoinbaseHeight(coinbaseTransaction, height) {
+    if (coinbaseTransaction.height !== height) {
+      return false
+    }
+
+    return true
+  }
+
+  validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions, UTXO, height }) {
     this.logger('Validating coinbase transaction')
 
     if (!this.validateCoinbaseTransactionSchema(coinbaseTransaction)) {
+      return false
+    }
+
+    if (!this.validateCoinbaseHeight(coinbaseTransaction, height)) {
       return false
     }
 
@@ -265,6 +278,9 @@ export class TransactionManager {
     }
 
     return outputObject
+  }
+
+  createCoinbase({ receiverPublicKey, blockTransactions }) {
   }
 
   createTransaction({ keyPair, UTXO, receiverPublicKey, amount, fee }) {
@@ -342,6 +358,9 @@ export class Transaction {
   constructor(transaction) {
     if (transaction?.inputs) {
       this.inputs = transaction.inputs.map(input => input)
+    }
+    if (transaction?.height) {
+      this.height = transaction.height
     }
     this.outputs = transaction.outputs.map(output => output)
   }

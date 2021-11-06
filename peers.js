@@ -51,7 +51,7 @@ export class PeerManager {
     const [address, port] = peer.address.split(':')
 
     client.on('connect', () => {
-      new ConnectedPeer({ socket: client, peerManager: this, objectManager: new ObjectManager, transactionManager: new TransactionManager })
+      new ConnectedPeer({ socket: client, peerManager: this })
     })
 
     client.on('error', () => {
@@ -126,7 +126,6 @@ export class ConnectedPeer extends Peer {
     this.socket = socket
     this.peerManager = peerManager
     this.transactionManager = new TransactionManager
-    this.objectManager = new ObjectManager
     this.blockManager = new BlockManager
     this.address = `${this.socket.remoteAddress}:${this.socket.remotePort}`
     this.peerManager.addNewConnectedPeer(this)
@@ -135,6 +134,8 @@ export class ConnectedPeer extends Peer {
 
     this.requestObject = this.requestObject.bind(this)
     this.receivedObject = this.receivedObject.bind(this)
+
+    this.objectManager = new ObjectManager(this.requestObject)
 
     socket.on('data', data => {
       this.buffer += data
@@ -214,7 +215,7 @@ export class ConnectedPeer extends Peer {
       objectid: objectId
     }
 
-    this.logger(`Requesting object with id ${objectId}: %O`, objectId)
+    this.logger(`Requesting object with id ${objectId}`)
     this.send(requestedObject)
 
     if (this.pendingObjectRequests[objectId]) {
@@ -298,7 +299,7 @@ export class ConnectedPeer extends Peer {
 
       const isValidBlock = await this.blockManager.validateBlock({
         block,
-        requestObject: this.requestObject
+        getObject: this.objectManager.getObject
       })
     }
   }
@@ -325,22 +326,22 @@ export class ConnectedPeer extends Peer {
     this.send(peersMessage)
   }
 
-  async handleChainTip({ blockId, requestObject }) {
+  async handleChainTip({ blockId, getObject }) {
     this.logger('Received chaintip with id: %O', blockId)
     if (!this.peerManager.blockchainManager.isBlockInMyBlockchain(blockId)) {
       this.peerManager.blockchainManager.logger('Chaintip already in the blockchain')
       return
     }
 
-    const chainTip = await requestObject(blockId)
+    const chainTip = await getObject(blockId)
     this.blockManager.logger('Validating the received chaintip')
-    if (!await this.blockManager.validateBlock({ block: chainTip, requestObject })) {
+    if (!await this.blockManager.validateBlock({ block: chainTip, getObject })) {
       return
     }
     this.blockManager.logger('Successfully validated the received chaintip: %O', blockId)
 
     this.peerManager.blockchainManager.logger('Checking to add to blockchain')
-    await this.peerManager.blockchainManager.handleNewValidBlock({ validBlock: chainTip, requestObject })
+    await this.peerManager.blockchainManager.handleNewValidBlock({ validBlock: chainTip, getObject })
   }
 
   sendChainTip() {
@@ -434,7 +435,7 @@ export class ConnectedPeer extends Peer {
     }
 
     if (message.type === 'chaintip') {
-      this.handleChainTip({ blockId: message.blockid, requestObject: this.requestObject })
+      this.handleChainTip({ blockId: message.blockid, getObject: this.objectManager.getObject })
       return
     }
 

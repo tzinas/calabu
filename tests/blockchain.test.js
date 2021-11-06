@@ -28,7 +28,7 @@ let UTXO = {}
 //publicKey: 1d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb
 //privateKey: 4addab16b2ff83f1b407c72f6c0a3c7ed281f43632ee7ed62eacfc30422412261d5d5d4fc6688588dbfc57f0544bc2eda44ceed7afe4299eba2cd811e6f1dbbb
 
-const COINBASE_1 =  new Transaction({ type: "transaction", outputs: [{ pubkey: "6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5", value: 50 * 10**12 + 200 }] })
+const COINBASE_1 =  new Transaction({ type: "transaction", outputs: [{ pubkey: "6a8291f07d35181861ac1d255e35eda3bcc6e776ddeef0c129ca396bded546c5", value: 50 * 10**12 + 200 }], height: 2 })
 UTXO = transactionManager.getNewUTXO({ UTXO, transaction: COINBASE_1 })
 
 const TRANSACTION_1 = transactionManager.createTransaction({
@@ -59,7 +59,7 @@ const BLOCK_1 = new Block({ "type": "block", "txids": [transactionManager.getTra
 const BLOCK_2 = new Block({ "type": "block", "txids": [transactionManager.getTransactionHash(TRANSACTION_2)], "nonce": "1adfa12cabb872ce016df299614", "previd": blockManager.getBlockHash(BLOCK_1), "created": 1624219081, "T": "00000002af000000000000000000000000000000000000000000000000000000" })
 const BLOCK_3 = new Block({ "type": "block", "txids": [transactionManager.getTransactionHash(COINBASE_1), transactionManager.getTransactionHash(TRANSACTION_1)], "nonce": "8531872ce00a3b16df299614", "previd": "00000000a420b7cefa2b7730243316921ed59ffe836e111ca3801f82a4f5360e", "created": 1624219079, "T": "00000002af000000000000000000000000000000000000000000000000000000" })
 
-const requestObject = async (objectId) => {
+const getObject = async (objectId) => {
   if (objectId === blockManager.getBlockHash(GENESIS_BLOCK)) {
     return GENESIS_BLOCK
   }
@@ -94,7 +94,7 @@ test('find correct ancestor block', async () => {
 
   const blockchain = new Set([blockManager.getBlockHash(GENESIS_BLOCK), blockManager.getBlockHash(BLOCK_1), blockManager.getBlockHash(BLOCK_2)])
 
-  const ancestor = await blockchainManager.getFirstAncestorBlock({ blockchain, otherBlock: BLOCK_3, requestObject })
+  const ancestor = await blockchainManager.getFirstAncestorBlock({ blockchain, otherBlock: BLOCK_3, getObject })
 
   const isValid = blockManager.getBlockHash(GENESIS_BLOCK) === blockManager.getBlockHash(ancestor)
 
@@ -104,7 +104,7 @@ test('find correct ancestor block', async () => {
 test('find correct height of block', async () => {
   const blockchainManager = new BlockchainManager()
 
-  const blockHeight = await blockchainManager.getBlockHeight({ knownHeightBlock: BLOCK_2, ancestorBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), knownHeight: 3, requestObject })
+  const blockHeight = await blockchainManager.getBlockHeight({ knownHeightBlock: BLOCK_2, ancestorBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), knownHeight: 3, getObject })
 
   expect(blockHeight).toBe(1)
 })
@@ -115,7 +115,7 @@ test('remove blocks from blockchain before block', async () => {
   const blockchain = new Set([blockManager.getBlockHash(GENESIS_BLOCK), blockManager.getBlockHash(BLOCK_1), blockManager.getBlockHash(BLOCK_2)])
   const expectedBlockchain = new Set([blockManager.getBlockHash(GENESIS_BLOCK)])
 
-  const newBlockchain = await blockchainManager.removeOrAddBlocksBefore({ type: 'remove', fromBlock: BLOCK_2, beforeBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), blockchain, requestObject })
+  const newBlockchain = await blockchainManager.removeOrAddBlocksBefore({ type: 'remove', fromBlock: BLOCK_2, beforeBlockHash: blockManager.getBlockHash(GENESIS_BLOCK), blockchain, getObject })
 
   expect(_.isEqual(newBlockchain, expectedBlockchain)).toBe(true)
 })
@@ -124,19 +124,19 @@ test('change to longest chain', async () => {
   const blockchainManager = new BlockchainManager()
 
   // longest chain
-  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_3, requestObject })
+  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_3, getObject })
   expect(blockchainManager.chainTip).toBe(blockManager.getBlockHash(BLOCK_3))
   expect(blockchainManager.chainHeight).toBe(2)
   expect(_.isEqual(blockchainManager.blockchain, new Set([blockManager.getBlockHash(GENESIS_BLOCK), blockManager.getBlockHash(BLOCK_3)]))).toBe(true)
 
   // equal length chain
-  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_1, requestObject })
+  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_1, getObject })
   expect(blockchainManager.chainTip).toBe(blockManager.getBlockHash(BLOCK_3))
   expect(blockchainManager.chainHeight).toBe(2)
   expect(_.isEqual(blockchainManager.blockchain, new Set([blockManager.getBlockHash(GENESIS_BLOCK), blockManager.getBlockHash(BLOCK_3)]))).toBe(true)
 
   // equal length chain
-  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_2, requestObject })
+  await blockchainManager.handleNewValidBlock({ validBlock: BLOCK_2, getObject })
   expect(blockchainManager.chainTip).toBe(blockManager.getBlockHash(BLOCK_2))
   expect(blockchainManager.chainHeight).toBe(3)
   expect(_.isEqual(blockchainManager.blockchain, new Set([blockManager.getBlockHash(GENESIS_BLOCK),blockManager.getBlockHash(BLOCK_1), blockManager.getBlockHash(BLOCK_2)]))).toBe(true)
@@ -154,12 +154,12 @@ describe('tests with sockets', () => {
   })
 
   test('get correct chain tip and set blockchain', async () => {
-    await connectedPeer.handleChainTip({ blockId: blockManager.getBlockHash(BLOCK_3), requestObject })
+    await connectedPeer.handleChainTip({ blockId: blockManager.getBlockHash(BLOCK_3), getObject })
     expect(connectedPeer.peerManager.blockchainManager.chainTip).toBe(blockManager.getBlockHash(BLOCK_3))
     expect(connectedPeer.peerManager.blockchainManager.chainHeight).toBe(2)
     expect(_.isEqual(connectedPeer.peerManager.blockchainManager.blockchain, new Set([blockManager.getBlockHash(GENESIS_BLOCK),blockManager.getBlockHash(BLOCK_3)]))).toBe(true)
 
-    await connectedPeer.handleChainTip({ blockId: blockManager.getBlockHash(BLOCK_2), requestObject })
+    await connectedPeer.handleChainTip({ blockId: blockManager.getBlockHash(BLOCK_2), getObject })
     expect(connectedPeer.peerManager.blockchainManager.chainTip).toBe(blockManager.getBlockHash(BLOCK_2))
     expect(connectedPeer.peerManager.blockchainManager.chainHeight).toBe(3)
     expect(_.isEqual(connectedPeer.peerManager.blockchainManager.blockchain, new Set([blockManager.getBlockHash(GENESIS_BLOCK),blockManager.getBlockHash(BLOCK_1), blockManager.getBlockHash(BLOCK_2)]))).toBe(true)

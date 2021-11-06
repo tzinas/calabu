@@ -182,10 +182,11 @@ test('validate correct coinbase transaction', () => {
     outputs: [{
       pubkey: "77bd8ef0bf4d9423f3681b01f8b5b4cfdf0ee69fb356a7762589f1b65cdcab63",
       value: 10
-    }]
+    }],
+    height: 120
   })
 
-  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: [], UTXO: {} })
+  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: [], UTXO: {}, height: 120 })
   expect(isValid).toBe(true)
 })
 
@@ -204,7 +205,7 @@ test('validate wrong coinbase transaction', () => {
     }]
   })
 
-  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction: wrongCoinbaseTransaction, normalTransactions: [], UTXO: {} })
+  const isValid = transactionManager.validateCoinbaseTransaction({ coinbaseTransaction: wrongCoinbaseTransaction, normalTransactions: [], UTXO: {}, height: 2 })
   expect(isValid).toBe(false)
 })
 

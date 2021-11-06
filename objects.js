@@ -4,6 +4,12 @@ import sha256 from 'sha256'
 import { logger, colorizeObjectManager } from './logger.js'
 
 export class ObjectManager {
+  requestObject
+
+  constructor(requestObject) {
+    this.requestObject = requestObject
+  }
+
   getObjectHash(object) {
     let objectHash = canonicalize(object)
     objectHash = sha256(objectHash)
@@ -16,7 +22,7 @@ export class ObjectManager {
     try {
       object = await db.get(`object/${objectId}`)
     } catch {
-      return false
+      return await this.requestObject(objectId)
     }
 
     object = JSON.parse(object)

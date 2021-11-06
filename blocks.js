@@ -31,7 +31,7 @@ export class BlockManager {
     this.getBlockObject = this.getBlockObject.bind(this)
   }
 
-  async validateBlockTransactions({ block, requestObject, UTXO }) {
+  async validateBlockTransactions({ block, getObject, UTXO, height }) {
     let currentUTXO = _.clone(UTXO)
 
     const transactions = []
@@ -40,7 +40,7 @@ export class BlockManager {
       this.logger('Requesting transaction: %O', txid)
       let transaction
       try {
-        transaction = await requestObject(txid)
+        transaction = await getObject(txid)
         this.logger('Got this transaction: %O', transaction)
         transactions.push(transaction)
       } catch (e) {
@@ -64,7 +64,7 @@ export class BlockManager {
       currentUTXO = this.transactionManager.getNewUTXO({ UTXO: currentUTXO, transaction: coinbaseTransaction })
       this.logger('New UTXO: %O', currentUTXO)
 
-      if (!this.transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: transactions, UTXO: currentUTXO })) {
+      if (!this.transactionManager.validateCoinbaseTransaction({ coinbaseTransaction, normalTransactions: transactions, UTXO: currentUTXO, height })) {
         this.logger('Incorrect coinbase transaction for this block')
         return false
       }
@@ -147,7 +147,7 @@ export class BlockManager {
     return blockHash === GENESIS_BLOCK_HASH
   }
 
-  async validateBlock({ block, requestObject }) {
+  async validateBlock({ block, getObject }) {
     this.logger('Now validating block: %O', block)
 
     if (!this.validateBlockSchema(block)) {
@@ -155,7 +155,7 @@ export class BlockManager {
     }
 
     if (this.isGenesisBlock(block)) {
-      return {}
+      return { UTXO: {}, height: 1 }
     }
 
     if (!block.previd) {
@@ -171,7 +171,7 @@ export class BlockManager {
     let previousBlock
 
     try {
-      previousBlock = await requestObject(block.previd)
+      previousBlock = await getObject(block.previd)
       this.logger('Got this previous block: %O', previousBlock)
     } catch (e) {
       this.logger('There was an error with the promise of the previous block: %O %O', block.previd, e)
@@ -183,22 +183,22 @@ export class BlockManager {
       return false
     }
 
-    let currentUTXO = await this.validateBlock({ block: previousBlock, requestObject })
+    let validatedBlockInfo = await this.validateBlock({ block: previousBlock, getObject })
 
-    if (!currentUTXO) {
+    if (!validatedBlockInfo) {
       this.logger('Failed validation for block: %O', this.getBlockHash(block))
       return false
     }
 
-    currentUTXO = await this.validateBlockTransactions({ block, requestObject, UTXO: currentUTXO })
-    this.logger('Current UTXO: %O', currentUTXO)
-    if (!currentUTXO) {
+    validatedBlockInfo.UTXO = await this.validateBlockTransactions({ block, getObject, UTXO: validatedBlockInfo.UTXO, height: validatedBlockInfo.height + 1 })
+    this.logger('Current UTXO: %O', validatedBlockInfo.UTXO)
+    if (!validatedBlockInfo.UTXO) {
       this.logger('Failed transaction validation for block: %O', this.getBlockHash(block))
       return false
     }
 
     this.logger('Successfully validated block: %O', this.getBlockHash(block))
-    return currentUTXO
+    return { UTXO: validatedBlockInfo.UTXO, height: validatedBlockInfo.height + 1 }
   }
 
   logger(message, ...args) {
