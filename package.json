@@ -19,6 +19,7 @@
   "homepage": "https://github.com/tzinas/calabu#readme",
   "dependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.14.5",
+    "dotenv": "^10.0.0",
     "ed25519": "0.0.5",
     "joi": "^17.4.0",
     "level": "^7.0.0",

@@ -1,6 +1,8 @@
 import Joi from 'joi'
 import sha256 from 'sha256'
 import _ from 'lodash'
+require('dotenv').config()
+
 import canonicalize from './canonicalize.js'
 import { logger, colorizeBlockManager } from './logger.js'
 import { TransactionManager } from './transactions.js'
@@ -161,11 +163,9 @@ export class BlockManager {
       return false
     }
 
-    /*
-    if (!this.validatePoW(block)) {
+    if (!this.validatePoW(block) && !process.env.JEST_WORKER_ID) {
       return false
     }
-    */
 
     this.logger('Requesting previous block: %O', block.previd)
     let previousBlock
