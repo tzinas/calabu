@@ -1,7 +1,8 @@
 import Joi from 'joi'
 import sha256 from 'sha256'
 import _ from 'lodash'
-require('dotenv').config()
+import dotenv from 'dotenv'
+dotenv.config()
 
 import canonicalize from './canonicalize.js'
 import { logger, colorizeBlockManager } from './logger.js'
