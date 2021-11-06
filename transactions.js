@@ -280,7 +280,15 @@ export class TransactionManager {
     return outputObject
   }
 
-  createCoinbase({ receiverPublicKey, blockTransactions }) {
+  createCoinbase({ receiverPublicKey, blockTransactions, height }) {
+    return new Transaction({
+      type: "transaction",
+      outputs: [{
+        pubkey: receiverPublicKey,
+        value: 50 * 10**12
+      }],
+      height
+    })
   }
 
   createTransaction({ keyPair, UTXO, receiverPublicKey, amount, fee }) {
