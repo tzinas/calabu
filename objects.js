@@ -8,6 +8,8 @@ export class ObjectManager {
 
   constructor(requestObject) {
     this.requestObject = requestObject
+
+    this.getObject = this.getObject.bind(this)
   }
 
   getObjectHash(object) {
